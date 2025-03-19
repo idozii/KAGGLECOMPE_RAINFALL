@@ -32,14 +32,9 @@ test_ids = test_data['id']
 X_test = test_data.drop('id', axis=1)
 
 # Handle missing values using an imputer
-print("\nImputing missing values...")
 imputer = SimpleImputer(strategy='mean')
 X = pd.DataFrame(imputer.fit_transform(X), columns=X.columns)
 X_test = pd.DataFrame(imputer.transform(X_test), columns=X_test.columns)
-
-# Verify no more missing values
-print(f"Missing values in training features after imputation: {X.isnull().sum().sum()}")
-print(f"Missing values in test features after imputation: {X_test.isnull().sum().sum()}")
 
 # Split training data for validation
 X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -69,14 +64,6 @@ xgb_val_preds = xgb_model.predict_proba(X_val)[:, 1]
 xgb_val_accuracy = accuracy_score(y_val, xgb_model.predict(X_val))
 xgb_val_auc = roc_auc_score(y_val, xgb_val_preds)
 print(f"XGBoost - Validation Accuracy: {xgb_val_accuracy:.4f}, AUC: {xgb_val_auc:.4f}")
-
-# Model 4: LightGBM
-lgb_model = LGBMClassifier(n_estimators=100, max_depth=6, random_state=42)
-lgb_model.fit(X_train, y_train)
-lgb_val_preds = lgb_model.predict_proba(X_val)[:, 1]
-lgb_val_accuracy = accuracy_score(y_val, lgb_model.predict(X_val))
-lgb_val_auc = roc_auc_score(y_val, lgb_val_preds)
-print(f"LightGBM - Validation Accuracy: {lgb_val_accuracy:.4f}, AUC: {lgb_val_auc:.4f}")
 
 # Probability calibration
 print("\nPerforming probability calibration...")
@@ -125,7 +112,7 @@ plt.close()
 print("\nCreating ensemble of calibrated models...")
 
 # Find the best weights based on validation AUC scores
-weights = [cal_rf_val_auc, gb_val_auc, cal_xgb_val_auc, lgb_val_auc]
+weights = [cal_rf_val_auc, gb_val_auc, cal_xgb_val_auc]
 weights = np.array(weights) / sum(weights)  # Normalize weights to sum to 1
 print(f"Model weights: {weights}")
 
@@ -133,8 +120,7 @@ print(f"Model weights: {weights}")
 ensemble_val_preds = (
     weights[0] * cal_rf_val_preds + 
     weights[1] * gb_val_preds + 
-    weights[2] * cal_xgb_val_preds + 
-    weights[3] * lgb_val_preds
+    weights[2] * cal_xgb_val_preds
 )
 ensemble_val_auc = roc_auc_score(y_val, ensemble_val_preds)
 print(f"Ensemble - Validation AUC: {ensemble_val_auc:.4f}")
@@ -143,14 +129,12 @@ print(f"Ensemble - Validation AUC: {ensemble_val_auc:.4f}")
 rf_test_preds = calibrated_rf.predict_proba(X_test)[:, 1]
 gb_test_preds = gb_model.predict_proba(X_test)[:, 1]
 xgb_test_preds = calibrated_xgb.predict_proba(X_test)[:, 1]
-lgb_test_preds = lgb_model.predict_proba(X_test)[:, 1]
 
 # Create weighted ensemble predictions for test set
 test_preds_proba = (
     weights[0] * rf_test_preds + 
     weights[1] * gb_test_preds + 
-    weights[2] * xgb_test_preds + 
-    weights[3] * lgb_test_preds
+    weights[2] * xgb_test_preds
 )
 
 # Create submission file
