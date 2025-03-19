@@ -10,7 +10,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.calibration import CalibratedClassifierCV, calibration_curve
 from sklearn.impute import SimpleImputer
 from xgboost import XGBClassifier
-from lightgbm import LGBMClassifier
+from scipy.stats import rankdata
 
 # Load data
 train_data = pd.read_csv('data/train.csv')
