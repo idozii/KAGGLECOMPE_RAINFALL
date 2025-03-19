@@ -16,12 +16,6 @@ from lightgbm import LGBMClassifier
 train_data = pd.read_csv('data/train.csv')
 test_data = pd.read_csv('data/test.csv')
 
-# Check for missing values
-print("Missing values in train data:")
-print(train_data.isnull().sum())
-print("\nMissing values in test data:")
-print(test_data.isnull().sum())
-
 # Feature correlation with target
 plt.figure(figsize=(12, 10))
 corr = train_data.corr()
