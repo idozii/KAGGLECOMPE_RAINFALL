@@ -75,12 +75,9 @@ cal_rf_val_preds = calibrated_rf.predict_proba(X_val)[:, 1]
 cal_rf_val_auc = roc_auc_score(y_val, cal_rf_val_preds)
 print(f"Calibrated Random Forest - Validation AUC: {cal_rf_val_auc:.4f}")
 
-# Calibrate XGBoost
-calibrated_xgb = CalibratedClassifierCV(xgb_model, method='isotonic', cv=5)
-calibrated_xgb.fit(X_train, y_train)
-cal_xgb_val_preds = calibrated_xgb.predict_proba(X_val)[:, 1]
-cal_xgb_val_auc = roc_auc_score(y_val, cal_xgb_val_preds)
-print(f"Calibrated XGBoost - Validation AUC: {cal_xgb_val_auc:.4f}")
+# For XGBoost, use the base model without calibration due to compatibility issues
+# We'll reference the original XGBoost predictions directly
+print(f"XGBoost (using without calibration) - Validation AUC: {xgb_val_auc:.4f}")
 
 # Plot calibration curves
 plt.figure(figsize=(10, 8))
@@ -91,14 +88,11 @@ prob_true, prob_pred = calibration_curve(y_val, rf_val_preds, n_bins=10)
 plt.plot(prob_pred, prob_true, marker='o', label='Random Forest (uncalibrated)')
 
 prob_true, prob_pred = calibration_curve(y_val, xgb_val_preds, n_bins=10)
-plt.plot(prob_pred, prob_true, marker='s', label='XGBoost (uncalibrated)')
+plt.plot(prob_pred, prob_true, marker='s', label='XGBoost')
 
 # Calibrated models
 prob_true, prob_pred = calibration_curve(y_val, cal_rf_val_preds, n_bins=10)
 plt.plot(prob_pred, prob_true, marker='v', label='Random Forest (calibrated)')
-
-prob_true, prob_pred = calibration_curve(y_val, cal_xgb_val_preds, n_bins=10)
-plt.plot(prob_pred, prob_true, marker='^', label='XGBoost (calibrated)')
 
 plt.xlabel('Mean predicted probability')
 plt.ylabel('Fraction of positives')
@@ -109,10 +103,10 @@ plt.savefig('calibration_curves.png')
 plt.close()
 
 # Create ensemble predictions (weighted average)
-print("\nCreating ensemble of calibrated models...")
+print("\nCreating ensemble of models...")
 
 # Find the best weights based on validation AUC scores
-weights = [cal_rf_val_auc, gb_val_auc, cal_xgb_val_auc]
+weights = [cal_rf_val_auc, gb_val_auc, xgb_val_auc]
 weights = np.array(weights) / sum(weights)  # Normalize weights to sum to 1
 print(f"Model weights: {weights}")
 
@@ -120,7 +114,7 @@ print(f"Model weights: {weights}")
 ensemble_val_preds = (
     weights[0] * cal_rf_val_preds + 
     weights[1] * gb_val_preds + 
-    weights[2] * cal_xgb_val_preds
+    weights[2] * xgb_val_preds
 )
 ensemble_val_auc = roc_auc_score(y_val, ensemble_val_preds)
 print(f"Ensemble - Validation AUC: {ensemble_val_auc:.4f}")
@@ -128,7 +122,9 @@ print(f"Ensemble - Validation AUC: {ensemble_val_auc:.4f}")
 # Make predictions on test data with each model
 rf_test_preds = calibrated_rf.predict_proba(X_test)[:, 1]
 gb_test_preds = gb_model.predict_proba(X_test)[:, 1]
-xgb_test_preds = calibrated_xgb.predict_proba(X_test)[:, 1]
+xgb_test_preds = xgb_model.predict_proba(X_test)[:, 1]  # Using uncalibrated XGBoost
+
+# ...existing code...
 
 # Create weighted ensemble predictions for test set
 test_preds_proba = (
@@ -137,10 +133,13 @@ test_preds_proba = (
     weights[2] * xgb_test_preds
 )
 
-# Create submission file
+# Convert probabilities to binary predictions (0 or 1)
+test_preds_binary = (test_preds_proba >= 0.5).astype(int)
+
+# Create submission file with binary predictions
 submission = pd.DataFrame({
     'id': test_ids,
-    'rainfall': test_preds_proba
+    'rainfall': test_preds_binary
 })
 
 submission.to_csv('submission.csv', index=False)
